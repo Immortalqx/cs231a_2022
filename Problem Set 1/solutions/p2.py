@@ -39,7 +39,72 @@ def compute_camera_matrix(real_XY, front_image, back_image):
     # Lastly, reshape and add the (0,0,0,1) row to M to have it be (3,4)
 
     # BEGIN YOUR CODE HERE
-    pass
+
+    # 思考：
+    #   三张图像都是，每行2个像素点，然后12行。已经是一一对应了，直接求解就好了！
+    #   real_xy是棋盘格的二维世界坐标，结合题中给出了Z（不是深度！），等于是有了三维世界坐标。
+    #   所以这里的情况是，相机不动（M矩阵不变），然后有两个棋盘格的数据，等于是求一个超定方程！
+    # 数学表述：
+    #   对于超定方程 p = MP, 求M
+    #   不过这种形式不好求解，所以可以根据ppt的方法，展开矩阵M为向量m，求解P'm=0
+    #   但是更简单的应该是根据[u,v]^T=[m_1*P/m_3*p, m_2*P/m_3*P]来求解，这里的矩阵要好构造一些，也不用考虑m_3的问题。
+
+    # 下面获取p和获取P有更简便的代码，如下所示：
+    #   A_temp = np.ones((dims[0], 1));
+    #   A1 = np.concatenate((real_XY, 0 * A_temp, A_temp), axis=1)
+    #   b1 = front_image[:, 0]
+    #   A2 = np.concatenate((real_XY, 150 * A_temp, A_temp), axis=1)
+    #   b2 = back_image[:, 0]
+    #   A = np.concatenate((A1, A2), axis=0)
+    #   b = np.concatenate((b1, b2), axis=0)
+
+    # 获取匹配的点的数目
+    img_num1 = front_image.shape[0]
+    img_num2 = back_image.shape[0]
+    # img_num2 = 0
+
+    # ================= 获取p =================
+    # 初始化（注意p是3x1齐次坐标）
+    p = np.zeros((2, img_num1 + img_num2))
+    # 把x,y赋值进去
+    for i in range(img_num1):
+        p[:, i] = front_image[i, :].T
+    for j in range(img_num2):
+        p[:, j + img_num1] = back_image[j, :].T
+    # 转化为齐次坐标
+    p_ones = np.ones((1, p.shape[1]))
+    p = np.vstack((p, p_ones)).T
+
+    # ================= 获取P =================
+    # 初始化（注意P是4x1齐次坐标）
+    P = np.zeros((2, img_num1 + img_num2))
+    # 把X, Y赋值进去
+    for i in range(img_num1):
+        P[:, i] = real_XY[i, :].T
+    for j in range(img_num2):
+        P[:, j + img_num1] = real_XY[j, :].T
+    # 把Z赋值进去
+    Z = np.zeros((1, P.shape[1]))
+    for k in range(Z.shape[1]):
+        # 第二张图就150，不然就默认为0
+        if k >= img_num1:
+            Z[:, k] = 150
+    P = np.vstack((P, Z))
+    # 转化为齐次坐标
+    P_ones = np.ones((1, P.shape[1]))
+    P = np.vstack((P, P_ones)).T
+
+    # ================= 计算M =================
+    # 根据m_1*P=u 求解m_1
+    m_1 = np.linalg.lstsq(P, p.T[0], rcond=None)[0]
+    # 根据m_2*P=v 求解m_2
+    m_2 = np.linalg.lstsq(P, p.T[1], rcond=None)[0]
+    # 由于是仿射变换，所以m_3可以直接指定
+    m_3 = np.array([0, 0, 0, 1])
+    M = np.vstack((m_1, m_2, m_3))
+
+    return M
+
     # END YOUR CODE HERE
 
 
@@ -58,7 +123,31 @@ Returns:
 
 def rms_error(camera_matrix, real_XY, front_image, back_image):
     # BEGIN YOUR CODE HERE
-    pass
+
+    # 思考：
+    #  这里直接套公式就可以了，先是求p'=MP，再根据p与p'求RMS
+
+    # ================= 获取P =================
+    P_ones = np.ones((real_XY.shape[0], 1));
+    P_1 = np.concatenate((real_XY, 0 * P_ones, P_ones), axis=1)
+    P_2 = np.concatenate((real_XY, 150 * P_ones, P_ones), axis=1)
+    P = np.concatenate((P_1, P_2), axis=0)
+
+    # ================= 获取p =================
+    p_u = np.concatenate((front_image[:, 0], back_image[:, 0]), axis=0)
+    p_v = np.concatenate((front_image[:, 1], back_image[:, 1]), axis=0)
+    p = np.vstack((p_u, p_v)).T
+
+    # ================= 计算p' =================
+    p_pred = camera_matrix.dot(P.T)[:2].T
+
+    # ================= 计算RMS =================
+    x_ = (p.T[0] - p_pred.T[0]) ** 2
+    y_ = (p.T[1] - p_pred.T[1]) ** 2
+    RMS = np.sqrt((np.sum(x_ + y_) / x_.shape[0]))
+
+    return RMS
+
     # END YOUR CODE HERE
 
 
