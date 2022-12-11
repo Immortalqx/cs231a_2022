@@ -19,8 +19,43 @@ point algorithm works
 
 
 def lls_eight_point_alg(points1, points2):
-    # TODO: Implement this method!
-    raise Exception('Not Implemented Error')
+    # 想法：
+    # 核心公式：p^T*F*p'=0，可以转化为：Wf=0
+    # 这里点的数目非常多，N>8，所以通过SVD进行求解！
+
+    # 定义计算矩阵W的每一行的函数
+    def compute_row(point1, point2):
+        u1 = point1[0]
+        v1 = point1[1]
+        u2 = point2[0]
+        v2 = point2[1]
+        return np.array([u1 * u2, u1 * v2, u1, v1 * u2, v1 * v2, v1, u2, v2, 1])
+
+    # 计算矩阵W
+    point_num = points1.shape[0]
+    W = np.zeros((point_num, 9))
+
+    for i in range(point_num):
+        W[i] = compute_row(points1[i], points2[i])
+
+    # 计算矩阵F_hat
+    # SVD分解求f
+    _, _, V_T = np.linalg.svd(W)
+    f = V_T[-1, :]
+    # normalize |f|=1
+    f = f / np.sqrt(np.sum(f ** 2))
+    # turn to Matrix F_hat
+    F_hat = f.reshape((3, 3))
+
+    # 计算矩阵F
+    # 对F_hat进行SVD分解
+    U, s_hat, V_T = np.linalg.svd(F_hat)
+    # 取前两个奇异值
+    s = np.zeros((3, 3))
+    s[0][0] = s_hat[0]
+    s[1][1] = s_hat[1]
+    # 计算F
+    return U.dot(s).dot(V_T)
 
 
 '''
@@ -39,8 +74,39 @@ point algorithm works
 
 
 def normalized_eight_point_alg(points1, points2):
-    # TODO: Implement this method!
-    raise Exception('Not Implemented Error')
+    # 0.compute T and T' for image 1 and 2
+    # T包括2D的平移和缩放，形式如下：
+    #           s 0 t1
+    #       T = 0 s t2
+    #           0 0 1
+
+    # 定义函数计算T
+    def compute_T(points):
+        # 转到非齐次坐标系
+        points_uv = points[:, 0:2]
+        # 计算中心点的位置
+        mean = np.mean(points_uv, axis=0)
+        # 平移
+        points_center = points_uv - mean
+        # 计算缩放的比例（缩放到2个pixel）
+        scale = np.sqrt(2 / (np.sum(points_center ** 2) / points_uv.shape[0] * 1.0))
+        # 计算T
+        return np.array([[scale, 0, -mean[0] * scale],
+                         [0, scale, -mean[1] * scale],
+                         [0, 0, 1]])
+
+    T_1 = compute_T(points1)
+    T_2 = compute_T(points2)
+
+    # 1.normalize coordinates in images 1 and 2
+    points1_ = T_1.dot(points1.T).T
+    points2_ = T_2.dot(points2.T).T
+
+    # 2.use the eight-point algorithm to compute F_q
+    F_q = lls_eight_point_alg(points1_, points2_)
+
+    # 3.de-normalize F_q: F=T^T*F_q*T'
+    return T_1.T.dot(F_q).dot(T_2)
 
 
 '''
@@ -106,8 +172,17 @@ Returns:
 
 
 def compute_distance_to_epipolar_lines(points1, points2, F):
-    # TODO: Implement this method!
-    raise Exception('Not Implemented Error')
+    # 思路：
+    # 这里要计算点与极线之间的平均距离
+    # 极线 l = F*p', l' = F^T*p
+
+    # 计算得一组极线
+    l = F.T.dot(points2.T)
+    # 参考网上的，写的很简便！！！
+    # distance from point(x0, y0) to line: Ax + By + C = 0 is
+    # |Ax0 + By0 + C| / sqrt(A^2 + B^2)
+    d = np.mean(np.abs(np.sum(l * points1.T, axis=0)) / np.sqrt(l[0, :] ** 2 + l[1, :] ** 2))
+    return d
 
 
 if __name__ == '__main__':
