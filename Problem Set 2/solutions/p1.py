@@ -55,7 +55,8 @@ def lls_eight_point_alg(points1, points2):
     s[0][0] = s_hat[0]
     s[1][1] = s_hat[1]
     # 计算F
-    return U.dot(s).dot(V_T)
+    # FIXME: 为什么这里要加上转置？
+    return U.dot(s).dot(V_T).T
 
 
 '''
@@ -106,7 +107,9 @@ def normalized_eight_point_alg(points1, points2):
     F_q = lls_eight_point_alg(points1_, points2_)
 
     # 3.de-normalize F_q: F=T^T*F_q*T'
-    return T_1.T.dot(F_q).dot(T_2)
+    # FIXME: 由于原八点法结果转置，这里也要跟着转置，但是为什么？（为什么和推导的公式不一样，为什么前面错了这里也要被影响）
+    # return T_1.T.dot(F_q).dot(T_2)
+    return T_2.T.dot(F_q).dot(T_1)
 
 
 '''
