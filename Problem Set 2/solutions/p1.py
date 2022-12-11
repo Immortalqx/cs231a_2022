@@ -56,6 +56,7 @@ def lls_eight_point_alg(points1, points2):
     s[1][1] = s_hat[1]
     # 计算F
     # FIXME: 为什么这里要加上转置？
+    # return U.dot(s).dot(V_T)
     return U.dot(s).dot(V_T).T
 
 
